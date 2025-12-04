@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: aurora-dashboard
+    env: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        # REQUIRED: Set this in Render Dashboard Environment Variables
+        # Value: https://kqdiickzowoffpleavfh.supabase.co
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        # REQUIRED: Set this in Render Dashboard Environment Variables
+        # Get from your Supabase project settings
+        sync: false
+      - key: NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
+        # OPTIONAL: For Google Places integration
+        sync: false
+      - key: VAPI_API_KEY
+        # OPTIONAL: For Vapi AI receptionist
+        sync: false
+      - key: N8N_WEBHOOK_URL
+        # OPTIONAL: For n8n workflow integration
+        sync: false
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://aurora-dashboard.onrender.com
