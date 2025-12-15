@@ -8,7 +8,7 @@ import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Phone, Clock, MessageSquare } from 'lucide-react'
+import { Phone, Clock, MessageSquare, Loader2 } from 'lucide-react'
 import { getCustomerAgents } from '@/lib/customer-agents'
 import { getCustomerId } from '@/lib/vapi-api-key'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -122,19 +122,6 @@ export function WebhookDashboard() {
       return dateString
       }
     }
-
-  const formatTime = (dateString: string | null): string => {
-    if (!dateString) return 'Unknown time'
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-      })
-    } catch {
-      return dateString
-    }
-  }
 
   const extractTranscript = (transcript: any): string => {
     if (!transcript) return 'No transcript available'

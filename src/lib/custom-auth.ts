@@ -79,53 +79,6 @@ export async function authenticateWithCustomersTable(email: string, password: st
 }
 
 /**
- * Fallback: Direct query (will only work if RLS allows it)
- */
-async function authenticateDirectQuery(email: string, password: string): Promise<{
-  customer: Customer | null
-  error: string | null
-}> {
-  try {
-    // Try direct query - this may fail due to RLS policies
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, email, company, created_at, password')
-      .eq('email', email.trim())
-      .single()
-
-    if (error) {
-      console.error('Direct query error:', error)
-      return { 
-        customer: null, 
-        error: 'Please create the authenticate_customer function in Supabase. See supabase-auth-function.sql' 
-      }
-    }
-
-    if (!data) {
-      return { customer: null, error: 'Invalid email or password' }
-    }
-
-    // Check password
-    if (data.password !== password) {
-      return { customer: null, error: 'Invalid email or password' }
-    }
-
-    return { 
-      customer: {
-        id: data.id,
-        email: data.email,
-        company: data.company,
-        created_at: data.created_at
-      }, 
-      error: null 
-    }
-  } catch (error: any) {
-    console.error('Direct query auth error:', error)
-    return { customer: null, error: error.message || 'Authentication failed' }
-  }
-}
-
-/**
  * Create a mock session for customer
  * Since we're authenticating against customers table, we create a session-like object
  * Also persists authentication in cookies
