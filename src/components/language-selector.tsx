@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useLanguageStore, sortedLanguages } from '@/stores/language-store'
+import { useTranslation } from '@/lib/translations'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,6 +15,7 @@ import { Check } from 'lucide-react'
 
 export function LanguageSelector() {
   const { currentLanguage, setLanguage } = useLanguageStore()
+  const t = useTranslation()
   const [open, setOpen] = useState(false)
 
   return (
@@ -21,11 +23,11 @@ export function LanguageSelector() {
       <DropdownMenuTrigger asChild>
         <Button variant="outline" size="icon" className="relative">
           <Globe className="h-4 w-4" />
-          <span className="sr-only">Select language</span>
+          <span className="sr-only">{t.common.selectLanguage}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuLabel>Select Language</DropdownMenuLabel>
+        <DropdownMenuLabel>{t.common.selectLanguage}</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <div className="max-h-[300px] overflow-y-auto">
           {sortedLanguages.map((language) => (

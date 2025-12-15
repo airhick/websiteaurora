@@ -11,17 +11,6 @@ export const languages: Language[] = [
   { code: 'en', name: 'English', flag: '🇬🇧', nativeName: 'English' },
   { code: 'fr', name: 'French', flag: '🇫🇷', nativeName: 'Français' },
   { code: 'de', name: 'German', flag: '🇩🇪', nativeName: 'Deutsch' },
-  { code: 'es', name: 'Spanish', flag: '🇪🇸', nativeName: 'Español' },
-  { code: 'it', name: 'Italian', flag: '🇮🇹', nativeName: 'Italiano' },
-  { code: 'pt', name: 'Portuguese', flag: '🇵🇹', nativeName: 'Português' },
-  { code: 'nl', name: 'Dutch', flag: '🇳🇱', nativeName: 'Nederlands' },
-  { code: 'pl', name: 'Polish', flag: '🇵🇱', nativeName: 'Polski' },
-  { code: 'ru', name: 'Russian', flag: '🇷🇺', nativeName: 'Русский' },
-  { code: 'ja', name: 'Japanese', flag: '🇯🇵', nativeName: '日本語' },
-  { code: 'ko', name: 'Korean', flag: '🇰🇷', nativeName: '한국어' },
-  { code: 'zh', name: 'Chinese', flag: '🇨🇳', nativeName: '中文' },
-  { code: 'ar', name: 'Arabic', flag: '🇸🇦', nativeName: 'العربية' },
-  { code: 'hi', name: 'Hindi', flag: '🇮🇳', nativeName: 'हिन्दी' },
 ]
 
 // Sort languages by name
@@ -42,7 +31,10 @@ const getStoredLanguage = (): Language => {
     if (stored) {
       const parsed = JSON.parse(stored)
       const language = sortedLanguages.find((lang) => lang.code === parsed.code)
-      if (language) return language
+      // Only return if it's a valid language (en, fr, or de)
+      if (language && (language.code === 'en' || language.code === 'fr' || language.code === 'de')) {
+        return language
+      }
     }
   } catch (error) {
     console.error('Error loading language from storage:', error)
@@ -54,7 +46,9 @@ const getStoredLanguage = (): Language => {
 export const useLanguageStore = create<LanguageState>()((set, get) => ({
   currentLanguage: getStoredLanguage(),
   setLanguage: (code: string) => {
-    const language = sortedLanguages.find((lang) => lang.code === code) || sortedLanguages[0]
+    // Only allow valid language codes (en, fr, de)
+    const validCode = (code === 'en' || code === 'fr' || code === 'de') ? code : 'en'
+    const language = sortedLanguages.find((lang) => lang.code === validCode) || sortedLanguages[0]
     set({ currentLanguage: language })
     // Persist to localStorage
     try {

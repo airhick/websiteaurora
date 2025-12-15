@@ -10,7 +10,9 @@ BEGIN
     'totalCalls', COUNT(*),
     'live', COUNT(*) FILTER (WHERE status IN ('in-progress', 'ringing', 'queued')),
     'transferred', COUNT(*) FILTER (WHERE ended_reason LIKE '%forward%' OR ended_reason LIKE '%transfer%' OR ended_reason = 'customer-transferred-call'),
-    'totalMinutes', COALESCE(ROUND(SUM(duration)::NUMERIC / 60.0, 2), 0)
+    -- Calculate total minutes: sum all non-null durations and convert seconds to minutes
+    -- Only count durations that are > 0 to avoid invalid data
+    'totalMinutes', COALESCE(ROUND(SUM(CASE WHEN duration IS NOT NULL AND duration > 0 THEN duration ELSE 0 END)::NUMERIC / 60.0, 2), 0)
   ) INTO result
   FROM call_logs
   WHERE call_logs.customer_id = customer_id_param;

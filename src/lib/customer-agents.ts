@@ -57,48 +57,69 @@ export function parseAgents(agentsString: string | null): ParsedAgent[] {
 
 /**
  * Extract agent IDs from agents string
+ * Matches the Python script logic exactly: split by semicolon, strip whitespace, filter empty
  */
 export function extractAgentIds(agentsString: string | null): string[] {
-  if (!agentsString) return []
-  
-  // New format: semicolon-separated
-  if (agentsString.includes(';')) {
-    return agentsString.split(';').map(id => id.trim()).filter(Boolean)
+  if (!agentsString) {
+    return []
   }
   
-  // Old format: parse and extract
-  return parseAgents(agentsString).map(agent => agent.agentId)
+  // Match Python: agent_ids = raw_agents.split(';')
+  const agentIds = agentsString.split(';')
+  
+  // Match Python: clean_id = agent_id.strip() and if not clean_id: continue
+  const cleaned = agentIds
+    .map(id => id.trim())
+    .filter(Boolean) // Filter out empty strings
+  
+  return cleaned
 }
 
 /**
- * Get customer agents from Supabase
+ * Get customer agents from Supabase for a specific customer ID
+ * Uses RPC function to bypass RLS (similar to authenticate_customer)
+ * Matches the Python script approach: fetch ONLY the 'agents' column where id = customerId
  */
 export async function getCustomerAgents(customerId: number): Promise<string[]> {
   try {
+    // Convert customerId to number to ensure type match (database uses BIGINT)
+    const numericId = typeof customerId === 'string' ? parseInt(customerId, 10) : customerId
+    
+    if (isNaN(numericId)) {
+      console.error(`Invalid customer ID: ${customerId}`)
+      return []
+    }
+    
+    // Use RPC function to bypass RLS (similar to authenticate_customer)
     const { data, error } = await supabase
-      .from('customers')
-      .select('agents')
-      .eq('id', customerId)
-      .maybeSingle() // Use maybeSingle() instead of single() to handle empty results gracefully
+      .rpc('get_customer_agents', {
+        p_customer_id: numericId
+      })
     
     if (error) {
-      // Handle specific error codes
-      if (error.code === 'PGRST116') {
-        // No rows found - customer doesn't exist or has no agents
-        console.warn(`Customer ${customerId} not found or has no agents configured`)
+      // If function doesn't exist, provide helpful error message
+      if (error.code === '42883' || 
+          error.message?.includes('function') || 
+          error.message?.includes('does not exist') ||
+          error.message?.includes('get_customer_agents')) {
+        console.error(`Function not found. Please run supabase-get-customer-agents-function.sql in Supabase SQL Editor.`)
         return []
       }
-      console.error('Error fetching customer agents:', error)
+      console.error(`Error calling RPC function:`, error)
       return []
     }
     
-    if (!data || !data.agents) {
+    // RPC function returns the agents string directly (or NULL)
+    if (!data || data === null) {
       return []
     }
     
-    return extractAgentIds(data.agents)
+    // Match Python script: split by semicolon, strip whitespace, filter empty
+    const agentIds = extractAgentIds(data)
+    
+    return agentIds
   } catch (error: any) {
-    console.error('Error getting customer agents:', error)
+    console.error(`Exception in getCustomerAgents:`, error)
     return []
   }
 }

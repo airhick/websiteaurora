@@ -69,6 +69,43 @@ function extractSummary(call: VAPICall): string | null {
 }
 
 /**
+ * Calculate duration in seconds from call timestamps
+ * Falls back to calculating from startedAt and endedAt if duration is not provided
+ */
+function calculateDuration(call: VAPICall): number | null {
+  // If duration is provided and valid, use it
+  if (call.duration && typeof call.duration === 'number' && call.duration > 0) {
+    return call.duration
+  }
+  
+  // Otherwise, calculate from timestamps
+  if (call.startedAt) {
+    const startedAt = new Date(call.startedAt).getTime()
+    let endedAt: number | null = null
+    
+    // Check for endedAt directly on the call object
+    if (call.endedAt) {
+      endedAt = new Date(call.endedAt).getTime()
+    }
+    // Check artifact for end time
+    else if (call.artifact?.endedAt) {
+      endedAt = new Date(call.artifact.endedAt).getTime()
+    } else if (call.artifact?.ended_at) {
+      endedAt = new Date(call.artifact.ended_at).getTime()
+    }
+    
+    if (endedAt && startedAt && endedAt > startedAt) {
+      const durationSeconds = Math.round((endedAt - startedAt) / 1000)
+      if (durationSeconds > 0) {
+        return durationSeconds
+      }
+    }
+  }
+  
+  return null
+}
+
+/**
  * Sync VAPI calls to Supabase
  * Only syncs new calls that don't exist in the database
  * Filters calls by customer's agent IDs
@@ -86,18 +123,18 @@ export async function syncCallLogs(
       return { synced: 0, new: 0 }
     }
     
-    console.log(`Fetching calls for ${agentIds.length} agent(s):`, agentIds)
-    
     // Fetch calls from VAPI filtered by agent IDs
-    // Use date filter to get calls from the last year (optional, can be adjusted)
-    const oneYearAgo = new Date()
-    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1)
-    const startDate = oneYearAgo.toISOString().split('T')[0] + 'T00:00:00Z'
-    
+    // Note: Removed date filter as VAPI API may not support createdAtGt parameter
+    // Fetch ALL available calls (VAPI will paginate automatically)
     const vapiCalls = await fetchVAPICalls(apiKey, agentIds, {
-      limit: 1000,
-      createdAtGt: startDate,
+      limit: 1000, // Per batch limit - pagination will continue until all calls are fetched
+      // Removed createdAtGt - VAPI API returns 400 with date filters
     })
+    
+    if (vapiCalls.length === 0) {
+      console.warn(`No calls found in VAPI for these assistants. Make sure calls exist in VAPI.`)
+      return { synced: 0, new: 0 }
+    }
     
     if (vapiCalls.length === 0) {
       return { synced: 0, new: 0 }
@@ -141,14 +178,17 @@ export async function syncCallLogs(
     }
     
     // Prepare data for insertion
-    const callLogsToInsert = newCalls.map(call => ({
+    const callLogsToInsert = newCalls.map(call => {
+      const calculatedDuration = calculateDuration(call)
+      
+      return {
       vapi_call_id: call.id,
       customer_id: customerId,
       status: call.status,
       type: call.type,
       started_at: call.startedAt || call.createdAt || null,
       created_at: call.createdAt || null,
-      duration: call.duration || null,
+        duration: calculatedDuration, // Use calculated duration (from VAPI or computed from timestamps)
       cost: call.cost || null,
       customer_number: call.customer?.number || null,
       ended_reason: call.endedReason || null,
@@ -158,7 +198,8 @@ export async function syncCallLogs(
       messages: call.messages || null,
       assistant_id: call.assistantId || null,
       artifact: call.artifact || null,
-    }))
+      }
+    })
     
     // Insert new calls (only if table exists)
     try {
@@ -168,7 +209,7 @@ export async function syncCallLogs(
       
       if (insertError) {
         if (insertError.code === 'PGRST205') {
-          console.warn('call_logs table does not exist. Please run supabase-call-logs-schema.sql')
+          console.warn('[syncCallLogs] ⚠️ call_logs table does not exist. Please run supabase-call-logs-schema.sql')
           // Return success but warn user
           return {
             synced: vapiCalls.length,
@@ -180,13 +221,22 @@ export async function syncCallLogs(
       }
     } catch (error: any) {
       if (error.code === 'PGRST205') {
-        console.warn('call_logs table does not exist. Please run supabase-call-logs-schema.sql')
+        console.warn('[syncCallLogs] ⚠️ call_logs table does not exist. Please run supabase-call-logs-schema.sql')
         return {
           synced: vapiCalls.length,
           new: newCalls.length,
         }
       }
+      console.error('Exception during insert:', error)
       throw error
+    }
+    // After syncing new calls, update durations for existing calls that don't have them
+    // This backfills duration for calls that were synced before we added duration calculation
+    try {
+      await updateMissingDurations(customerId, vapiCalls)
+    } catch (error) {
+      // Don't fail the sync if duration update fails
+      console.error('Error updating missing durations:', error)
     }
     
     return {
@@ -196,6 +246,103 @@ export async function syncCallLogs(
   } catch (error: any) {
     console.error('Error syncing call logs:', error)
     throw error
+  }
+}
+
+/**
+ * Update duration for existing calls that have NULL duration
+ * Uses the VAPI calls data we already have to backfill missing durations
+ */
+async function updateMissingDurations(
+  customerId: number,
+  vapiCalls: VAPICall[]
+): Promise<void> {
+  try {
+    // Create a map of VAPI calls by ID for quick lookup
+    const vapiCallsMap = new Map(vapiCalls.map(call => [call.id, call]))
+    
+    // Process in batches to avoid overwhelming the database
+    let offset = 0
+    const batchSize = 100
+    let hasMore = true
+    
+    while (hasMore) {
+      // Get calls from database that have NULL duration
+      const { data: callsWithoutDuration, error: fetchError } = await supabase
+        .from('call_logs')
+        .select('id, vapi_call_id, started_at, created_at, artifact')
+        .eq('customer_id', customerId)
+        .is('duration', null)
+        .range(offset, offset + batchSize - 1)
+      
+      if (fetchError) {
+        if (fetchError.code === 'PGRST205') {
+          return // Table doesn't exist, skip
+        }
+        throw fetchError
+      }
+      
+      if (!callsWithoutDuration || callsWithoutDuration.length === 0) {
+        hasMore = false
+        break
+      }
+      
+      // Update each call with calculated duration
+      const updates = callsWithoutDuration.map(async (callLog) => {
+        // Try to find the call in the VAPI calls we just fetched
+        const vapiCall = vapiCallsMap.get(callLog.vapi_call_id)
+        
+        let calculatedDuration: number | null = null
+        
+        if (vapiCall) {
+          // Use VAPI call data if available
+          calculatedDuration = calculateDuration(vapiCall)
+        } else {
+          // Otherwise, try to calculate from existing database data
+          if (callLog.started_at) {
+            const startedAt = new Date(callLog.started_at).getTime()
+            let endedAt: number | null = null
+            
+            // Check artifact for end time
+            if (callLog.artifact) {
+              const artifact = callLog.artifact as any
+              if (artifact.endedAt) {
+                endedAt = new Date(artifact.endedAt).getTime()
+              } else if (artifact.ended_at) {
+                endedAt = new Date(artifact.ended_at).getTime()
+              }
+            }
+            
+            if (endedAt && startedAt && endedAt > startedAt) {
+              calculatedDuration = Math.round((endedAt - startedAt) / 1000)
+            }
+          }
+        }
+        
+        if (calculatedDuration && calculatedDuration > 0) {
+          const { error: updateError } = await supabase
+            .from('call_logs')
+            .update({ duration: calculatedDuration })
+            .eq('id', callLog.id)
+          
+          if (updateError) {
+            console.error(`Error updating duration for call ${callLog.vapi_call_id}:`, updateError)
+          }
+        }
+      })
+      
+      await Promise.all(updates)
+      
+      // Check if we need to process more
+      if (callsWithoutDuration.length < batchSize) {
+        hasMore = false
+      } else {
+        offset += batchSize
+      }
+    }
+  } catch (error: any) {
+    console.error('Error in updateMissingDurations:', error)
+    // Don't throw - this is a background operation
   }
 }
 

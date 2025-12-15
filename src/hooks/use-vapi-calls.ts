@@ -38,26 +38,33 @@ export function useVAPICalls() {
     setApiKey(key)
   }, [])
 
-  // Load calls from database first (fast)
+  // Load calls from database - DELAYED to not block initial page load
+  // Stats are calculated separately from call_logs table, so this is only for Recent Activity
   useEffect(() => {
-    const loadFromDB = async () => {
-      const customerId = getCustomerId()
-      if (!customerId) return
+    // Delay loading by 1.5 seconds to let stats load first
+    const timeout = setTimeout(() => {
+      const loadFromDB = async () => {
+        const customerId = getCustomerId()
+        if (!customerId) return
 
-      try {
-        // Load a larger batch from DB for stats calculation
-        const dbLogs = await getCallLogs(customerId, 10000) // Get up to 10k calls from DB
-        const dbCalls = dbLogs.map(callLogToVAPICall)
-        setCalls(dbCalls)
-      } catch (err: any) {
-        // If table doesn't exist, that's okay - we'll fetch from VAPI
-        if (err.code !== 'PGRST205' && !err.message?.includes('call_logs')) {
-          console.error('Error loading calls from DB:', err)
+        try {
+          // Load only a small batch initially (for Recent Activity, not for stats)
+          // Stats are calculated separately from call_logs table
+          const dbLogs = await getCallLogs(customerId, 50) // Only 50 calls for initial display
+          const dbCalls = dbLogs.map(callLogToVAPICall)
+          setCalls(dbCalls)
+        } catch (err: any) {
+          // If table doesn't exist, that's okay - we'll fetch from VAPI
+          if (err.code !== 'PGRST205' && !err.message?.includes('call_logs')) {
+            console.error('Error loading calls from DB:', err)
+          }
         }
       }
-    }
 
-    loadFromDB()
+      loadFromDB()
+    }, 1500) // Delay by 1.5 seconds
+
+    return () => clearTimeout(timeout)
   }, [])
 
   const refreshCalls = useCallback(async () => {

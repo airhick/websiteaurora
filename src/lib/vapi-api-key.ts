@@ -51,19 +51,32 @@ export function setVAPIApiKey(apiKey: string): void {
  * Get customer ID from auth state or localStorage
  */
 export function getCustomerId(): number | null {
+  // Try localStorage first (matches custom auth flow)
   const customerData = localStorage.getItem('aurora_customer')
   if (customerData) {
     try {
       const customer = JSON.parse(customerData)
-      return customer.id
+        const id = customer.id
+      
+      // Ensure it's a number
+      const numericId = typeof id === 'string' ? parseInt(id, 10) : id
+      if (isNaN(numericId)) {
+        return null
+      }
+      return numericId
     } catch (error) {
-      console.error('Failed to parse customer data:', error)
+      console.error('[getCustomerId] Failed to parse customer data:', error)
     }
   }
   
+  // Fallback to auth store
   const user = useAuthStore.getState().auth.user
   if (user?.id) {
-    return parseInt(user.id, 10)
+    const id = parseInt(user.id, 10)
+    if (isNaN(id)) {
+      return null
+    }
+    return id
   }
   
   return null

@@ -19,49 +19,42 @@ export function useWebhookListener() {
   }, [])
 
   // Setup Realtime subscription - only for this customer's events
+  // DELAYED to not block initial page load
   useEffect(() => {
-    const customerId = customerIdRef.current
-    if (!customerId) {
-      console.log('No customer ID found, skipping webhook listener setup')
-      return
-    }
+    // Delay webhook listener by 1 second to let critical data load first
+    const timeout = setTimeout(() => {
+      const customerId = customerIdRef.current
+      if (!customerId) {
+        return
+      }
 
-    console.log(`Setting up webhook listener for customer_id: ${customerId}`)
-
-    const channel = supabase
-      .channel(`webhook-listener-${customerId}`) // Unique channel per customer
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'user_events',
-          filter: `customer_id=eq.${customerId}`, // Only listen to this customer's events
-        },
-        (payload) => {
-          console.log('Webhook event received for customer:', customerId, payload)
-          const newEvent = payload.new as WebhookNotification
-          
-          // Double-check that the event belongs to this customer
-          if (newEvent.customer_id === customerId) {
-            addNotification(newEvent)
-          } else {
-            console.warn('Received event for different customer_id, ignoring:', {
-              eventCustomerId: newEvent.customer_id,
-              currentCustomerId: customerId,
-            })
+      const channel = supabase
+        .channel(`webhook-listener-${customerId}`) // Unique channel per customer
+        .on(
+          'postgres_changes',
+          {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'user_events',
+            filter: `customer_id=eq.${customerId}`, // Only listen to this customer's events
+          },
+          (payload) => {
+            const newEvent = payload.new as WebhookNotification
+            
+            // Double-check that the event belongs to this customer
+            if (newEvent.customer_id === customerId) {
+              addNotification(newEvent)
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`Webhook listener subscription status for customer ${customerId}:`, status)
-      })
+        )
+        .subscribe()
 
-    channelRef.current = channel
+      channelRef.current = channel
+    }, 1000) // Delay by 1 second
 
     return () => {
+      clearTimeout(timeout)
       if (channelRef.current) {
-        console.log(`Cleaning up webhook listener for customer ${customerId}`)
         supabase.removeChannel(channelRef.current)
         channelRef.current = null
       }

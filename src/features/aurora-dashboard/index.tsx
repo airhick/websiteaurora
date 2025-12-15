@@ -2,6 +2,9 @@ import { useState, useEffect, lazy, Suspense } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useCustomerSync } from '@/hooks/use-customer-sync'
 import { useWebhookListener } from '@/hooks/use-webhook-listener'
+import { useTranslation } from '@/lib/translations'
+import { useWebhookNotificationsStore } from '@/stores/webhook-notifications-store'
+import { getCustomerId } from '@/lib/vapi-api-key'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { TopNav } from '@/components/layout/top-nav'
@@ -9,27 +12,29 @@ import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
 import { LanguageSelector } from '@/components/language-selector'
-import { WebhookPopup } from '@/components/webhook-popup'
+import { WebhookSidebar } from '@/components/webhook-sidebar'
 import { PlanBadge } from '@/components/plan-badge'
 import { StatsCards } from './components/stats-cards'
 import { BusinessSetup } from './components/business-setup'
-import { Card, CardContent } from '@/components/ui/card'
-import { Loader2 } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // Lazy load heavy components to improve initial page load
 const CallDetails = lazy(() => import('./components/call-details').then(m => ({ default: m.CallDetails })))
 const AssistantConfig = lazy(() => import('./components/assistant-config').then(m => ({ default: m.AssistantConfig })))
-const CallLogs = lazy(() => import('./components/call-logs').then(m => ({ default: m.CallLogs })))
-const RecentActivity = lazy(() => import('./components/recent-activity').then(m => ({ default: m.RecentActivity })))
 
 export function AuroraDashboard() {
   const { user, loading } = useAuthStore((state) => state.auth)
+  const t = useTranslation()
   const [needsSetup, setNeedsSetup] = useState(false)
+  const currentNotification = useWebhookNotificationsStore((state) => state.currentNotification)
+  const currentCustomerId = getCustomerId()
+  const hasNotification = !!currentNotification && currentNotification.customer_id === currentCustomerId
   
-  // Sync user to customers table
+  // Sync user to customers table - Hook handles delay internally
   useCustomerSync()
   
-  // Listen for webhook events in real-time
+  // Listen for webhook events in real-time - Hook handles delay internally
   useWebhookListener()
 
   useEffect(() => {
@@ -45,15 +50,10 @@ export function AuroraDashboard() {
     setNeedsSetup(false)
   }
 
-  const handleStartTest = () => {
-    // This would be handled by the TestInterface component
-    console.log('Start test from Recent Activity')
-  }
-
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-lg">Loading your dashboard...</div>
+        <div className="text-lg">{t.dashboard.loading}</div>
       </div>
     )
   }
@@ -90,19 +90,19 @@ export function AuroraDashboard() {
         </div>
       </Header>
 
-      {/* Webhook Popup - Shows when a webhook event is received */}
-      <WebhookPopup />
+      {/* Webhook Sidebar - Shows on the right when a notification is received */}
+      <WebhookSidebar />
 
-      <Main>
+      <Main className={hasNotification ? 'mr-96 transition-all duration-300' : 'transition-all duration-300'}>
         <div className="space-y-6">
           {/* Page Header */}
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold tracking-tight">
-                Welcome back, {user?.user_metadata?.first_name || user?.email?.split('@')[0]}
+                {t.dashboard.welcomeBackName.replace('{name}', user?.user_metadata?.first_name || user?.email?.split('@')[0] || '')}
               </h1>
               <p className="text-muted-foreground">
-                Here's an overview of your AI receptionist
+                {t.dashboard.overview}
               </p>
             </div>
           </div>
@@ -112,63 +112,76 @@ export function AuroraDashboard() {
 
           {/* VAPI Information Grid - Lazy loaded */}
           <div className="grid gap-6 lg:grid-cols-1">
-            <Suspense fallback={<Card><CardContent className="pt-6"><div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div></CardContent></Card>}>
+            <Suspense fallback={
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-5 rounded" />
+                    <Skeleton className="h-5 w-48" />
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <div key={i} className="border rounded-lg p-3">
+                        <div className="flex items-center gap-3">
+                          <Skeleton className="h-4 w-4 rounded" />
+                          <div className="flex-1 space-y-2">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-24" />
+                          </div>
+                          <Skeleton className="h-5 w-16 rounded-full" />
+                          <Skeleton className="h-8 w-12 rounded" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            }>
               <CallDetails />
             </Suspense>
           </div>
 
           {/* Assistant Configuration - Lazy loaded */}
-          <Suspense fallback={<Card><CardContent className="pt-6"><div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div></CardContent></Card>}>
+          <Suspense fallback={
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Skeleton className="h-5 w-5 rounded" />
+                    <Skeleton className="h-5 w-56" />
+                  </CardTitle>
+                  <Skeleton className="h-8 w-8 rounded" />
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="border rounded-lg p-4 space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-6 w-48" />
+                        <Skeleton className="h-5 w-64 rounded-full" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-20 w-full rounded-lg" />
+                    </div>
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-40" />
+                      <div className="grid gap-2 md:grid-cols-2">
+                        <Skeleton className="h-16 w-full rounded-lg" />
+                        <Skeleton className="h-16 w-full rounded-lg" />
+                      </div>
+                  </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          }>
             <AssistantConfig />
           </Suspense>
-
-          {/* Call Logs - Lazy loaded */}
-          <Suspense fallback={<Card><CardContent className="pt-6"><div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div></CardContent></Card>}>
-            <CallLogs />
-          </Suspense>
-
-          {/* Recent Activity - Lazy loaded */}
-          <Suspense fallback={<Card><CardContent className="pt-6"><div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div></CardContent></Card>}>
-            <RecentActivity onStartTest={handleStartTest} />
-          </Suspense>
-
-          {/* Info Cards */}
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-start space-x-4">
-                  <div className="flex-1 space-y-3">
-                    <p className="font-semibold">Built for Excellence</p>
-                    <h3 className="text-2xl font-bold">Aurora AI Receptionist</h3>
-                    <p className="text-sm text-muted-foreground">
-                      Experience the future of call handling with our advanced AI
-                      technology that learns and adapts to your business needs.
-                    </p>
-                  </div>
-                  <div className="flex h-24 w-24 items-center justify-center rounded-lg bg-primary/10 p-2">
-                    <img 
-                      src="/logos/aurora-logo.png" 
-                      alt="Aurora Logo" 
-                      className="h-full w-full object-contain"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-primary/10 to-primary/5">
-              <CardContent className="flex h-full flex-col justify-between pt-6">
-                <div className="space-y-3">
-                  <h3 className="text-xl font-bold">Work Smarter, Not Harder</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Let Aurora handle your calls while you focus on growing your
-                    business. Our AI receptionist works 24/7 to ensure you never
-                    miss an opportunity.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </Main>
     </>

@@ -45,7 +45,7 @@ export const sidebarData: SidebarData = {
               icon: LayoutDashboard,
             },
             {
-              title: 'Incoming calls',
+              title: 'Previous calls',
               url: '/webhook',
               icon: Link2,
             },

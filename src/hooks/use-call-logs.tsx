@@ -78,9 +78,15 @@ export function useCallLogs() {
     }
   }, [getCustomerId, getApiKey, callLogs.length, loadCallLogs])
 
-  // Initial load
+  // Initial load - DELAYED to not block initial page load
   useEffect(() => {
-    loadCallLogs()
+    // Delay loading call logs to not block initial page load
+    // This component is lazy loaded, but still delay the fetch
+    const timeout = setTimeout(() => {
+      loadCallLogs()
+    }, 2000) // Delay by 2 seconds after component mounts
+    
+    return () => clearTimeout(timeout)
   }, [loadCallLogs])
 
   // Auto-sync every 5 minutes

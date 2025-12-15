@@ -10,15 +10,29 @@ import { ThemeSwitch } from '@/components/theme-switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Zap, Loader2, CheckCircle2, XCircle, Trash2, Phone } from 'lucide-react'
+import { Zap, Loader2, CheckCircle2, XCircle, Trash2, Phone, Clock, MessageSquare } from 'lucide-react'
+import { getCustomerAgents } from '@/lib/customer-agents'
+import { getCustomerId } from '@/lib/vapi-api-key'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
-interface UserEvent {
+interface CallLog {
   id: number
-  customer_id: number
-  event_type: string
-  payload: any
-  created_at: string
-  call_id?: string | null
+  vapi_call_id: string
+  customer_id: number | null
+  status: string | null
+  type: string | null
+  started_at: string | null
+  created_at: string | null
+  duration: number | null
+  cost: number | null
+  customer_number: string | null
+  ended_reason: string | null
+  summary: string | null
+  recording_url: string | null
+  transcript: any
+  messages: any
+  assistant_id: string | null
+  artifact: any
 }
 
 const topNav = [
@@ -28,110 +42,120 @@ const topNav = [
 
 export function WebhookDashboard() {
   const { user } = useAuthStore((state) => state.auth)
-  const [events, setEvents] = useState<UserEvent[]>([])
-  const [isConnected, setIsConnected] = useState(false)
+  const [calls, setCalls] = useState<CallLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const channelRef = useRef<any>(null)
   const customerIdRef = useRef<number | null>(null)
 
   // Get customer ID
   useEffect(() => {
-    const customerData = localStorage.getItem('aurora_customer')
-    if (customerData) {
-      try {
-        const customer = JSON.parse(customerData)
-        customerIdRef.current = customer.id
-      } catch (error) {
-        console.error('Failed to parse customer data:', error)
-      }
-    } else if (user?.id) {
-      customerIdRef.current = parseInt(user.id, 10)
-    }
-  }, [user])
+    const customerId = getCustomerId()
+    customerIdRef.current = customerId
+  }, [])
 
-  // Load existing events
+  // Load previous calls based on customer's agent IDs
   useEffect(() => {
-    const loadEvents = async () => {
-      if (!customerIdRef.current) return
+    const loadCalls = async () => {
+      const customerId = customerIdRef.current
+      if (!customerId) {
+        setIsLoading(false)
+        return
+      }
 
       try {
+        // Get agent IDs for this customer
+        const agentIds = await getCustomerAgents(customerId)
+        console.log('[WebhookDashboard] Agent IDs:', agentIds)
+
+        if (agentIds.length === 0) {
+          console.warn('[WebhookDashboard] No agent IDs found for customer')
+          setCalls([])
+          setIsLoading(false)
+          return
+        }
+
+        // Fetch call logs where assistant_id matches any of the agent IDs
         const { data, error } = await supabase
-          .from('user_events')
+          .from('call_logs')
           .select('*')
-          .eq('customer_id', customerIdRef.current)
+          .in('assistant_id', agentIds)
+          .order('started_at', { ascending: false, nullsFirst: false })
           .order('created_at', { ascending: false })
-          .limit(50)
+          .limit(100)
 
         if (error) {
-          console.error('Error loading events:', error)
+          console.error('[WebhookDashboard] Error loading calls:', error)
+          setCalls([])
         } else {
-          setEvents(data || [])
+          console.log(`[WebhookDashboard] Loaded ${data?.length || 0} calls`)
+          setCalls(data || [])
         }
       } catch (error) {
-        console.error('Error loading events:', error)
+        console.error('[WebhookDashboard] Error loading calls:', error)
+        setCalls([])
       } finally {
         setIsLoading(false)
       }
     }
 
-    loadEvents()
+    loadCalls()
   }, [])
 
-  // Setup Realtime subscription
-  useEffect(() => {
-    if (!customerIdRef.current) {
-      setIsLoading(false)
-      return
+  const formatDuration = (seconds: number | null): string => {
+    if (!seconds) return '0s'
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    if (mins > 0) {
+      return `${mins}m ${secs}s`
     }
+    return `${secs}s`
+  }
 
-    const channel = supabase
-      .channel('webhook-dashboard')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'user_events',
-          filter: `customer_id=eq.${customerIdRef.current}`,
-        },
-        (payload) => {
-          console.log('New event received:', payload)
-          const newEvent = payload.new as UserEvent
-          setEvents((prev) => [newEvent, ...prev])
-        }
-      )
-      .subscribe((status) => {
-        console.log('Subscription status:', status)
-        setIsConnected(status === 'SUBSCRIBED')
-        if (status === 'SUBSCRIBED') {
-          setIsLoading(false)
-        }
-      })
-
-    channelRef.current = channel
-
-    return () => {
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-      }
-    }
-  }, [])
-
-  const extractUserMessage = (payload: any): string => {
+  const formatDateTime = (dateString: string | null): string => {
+    if (!dateString) return 'Unknown date'
     try {
-      if (payload?.message?.artifact?.messages) {
-        const msgs = payload.message.artifact.messages
-        const lastMsg = msgs[msgs.length - 1]
-        if (lastMsg?.message) return lastMsg.message
+      const date = new Date(dateString)
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return dateString
       }
-      if (payload?.message) return String(payload.message)
-      if (payload?.action) return `Action: ${payload.action}`
-      if (payload?.reason) return `Transfer reason: ${payload.reason}`
-      if (payload?.customer_request) return `Customer requested: ${payload.customer_request}`
-      return 'Call transfer request - User wanted to speak with a human agent'
-    } catch (e) {
-      return 'Call transfer request - User wanted to speak with a human agent'
     }
+
+  const formatTime = (dateString: string | null): string => {
+    if (!dateString) return 'Unknown time'
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return dateString
+    }
+  }
+
+  const extractTranscript = (transcript: any): string => {
+    if (!transcript) return 'No transcript available'
+    
+    // Handle different transcript formats
+    if (Array.isArray(transcript)) {
+      return transcript.map((t: any) => t.content || t.text || JSON.stringify(t)).join('\n')
+    }
+    
+    if (typeof transcript === 'string') {
+      return transcript
+    }
+    
+    if (transcript.content) {
+      return transcript.content
+    }
+    
+    return JSON.stringify(transcript)
   }
 
   return (
@@ -156,20 +180,14 @@ export function WebhookDashboard() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              {isConnected ? (
-                <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
-                  <CheckCircle2 className="mr-1 h-3 w-3" />
-                  Connecté
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="bg-red-100 text-red-800">
-                  <XCircle className="mr-1 h-3 w-3" />
-                  Déconnecté
-                </Badge>
-              )}
               {customerIdRef.current && (
                 <Badge variant="outline">
                   Customer ID: {customerIdRef.current}
+                </Badge>
+              )}
+              {calls.length > 0 && (
+                <Badge variant="secondary">
+                  {calls.length} call{calls.length !== 1 ? 's' : ''}
                 </Badge>
               )}
             </div>
@@ -178,11 +196,10 @@ export function WebhookDashboard() {
           <div className="space-y-4">
               <div className="flex items-center gap-2">
                 <Phone className="h-5 w-5" />
-                <h2 className="text-xl font-bold">Call Transfer Requests</h2>
+                <h2 className="text-xl font-bold">Previous Calls</h2>
               </div>
               <p className="text-sm text-muted-foreground">
-                These are calls where the AI receptionist detected that the caller wanted to speak with a human agent. 
-                Each event represents a transfer request that was sent to n8n for processing.
+                All calls handled by your AI assistants, including transcript, summary, duration, and timestamps.
               </p>
 
               {isLoading ? (
@@ -191,87 +208,70 @@ export function WebhookDashboard() {
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                   </CardContent>
                 </Card>
-              ) : events.length === 0 ? (
+              ) : calls.length === 0 ? (
                 <Card>
                   <CardContent className="text-center py-12 text-muted-foreground italic border-dashed">
-                    No transfer requests yet. When a caller requests to speak with a human, 
-                    the event will appear here automatically.
+                    No calls found yet. Calls will appear here once they are synced to the database.
                   </CardContent>
                 </Card>
               ) : (
                 <div className="space-y-4">
-                  {events.map((event) => {
-                    const userMessage = extractUserMessage(event.payload)
+                  {calls.map((call) => {
+                    const transcript = extractTranscript(call.transcript)
+                    const summary = call.summary || 'No summary available'
+                    const duration = formatDuration(call.duration)
+                    const dateTime = formatDateTime(call.started_at || call.created_at)
+                    const time = formatTime(call.started_at || call.created_at)
+                    
                     return (
-                      <Card key={event.id} className="overflow-hidden">
-                        <div className="border-b bg-muted/50 p-4 flex justify-between items-center">
-                          <span className="font-semibold text-sm">Transfer Request</span>
-                          <div className="flex items-center gap-3">
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(event.created_at).toLocaleTimeString('fr-FR', {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                second: '2-digit',
-                              })}
-                            </span>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={async () => {
-                                try {
-                                  const { error } = await supabase
-                                    .from('user_events')
-                                    .delete()
-                                    .eq('id', event.id)
-
-                                  if (error) {
-                                    console.error('Error deleting event:', error)
-                                  } else {
-                                    setEvents((prev) => prev.filter((e) => e.id !== event.id))
-                                  }
-                                } catch (error) {
-                                  console.error('Error deleting event:', error)
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                      <Card key={call.id} className="overflow-hidden">
+                        <div className="border-b bg-muted/50 p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 flex-wrap mb-2">
+                                <Badge variant={call.status === 'ended' ? 'default' : 'destructive'}>
+                                  {call.status || 'Unknown'}
+                                </Badge>
+                                {call.assistant_id && (
+                                  <Badge variant="outline" className="font-mono text-xs">
+                                    {call.assistant_id.substring(0, 8)}...
+                                  </Badge>
+                                )}
+                                {call.customer_number && (
+                                  <span className="text-sm font-medium">{call.customer_number}</span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{dateTime}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <span>Duration: {duration}</span>
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <CardContent className="p-4">
-                          <div className="mb-3">
-                            <span className="text-sm font-semibold text-muted-foreground">Call Summary:</span>
-                            <p className="text-lg font-medium mt-1">
-                              {typeof userMessage === 'string' ? userMessage : JSON.stringify(userMessage)}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              This call was transferred because the caller requested to speak with a human agent.
-                            </p>
+                        <CardContent className="p-4 space-y-4">
+                          {/* AI Summary */}
+                          <div>
+                            <div className="flex items-center gap-2 mb-2">
+                              <MessageSquare className="h-4 w-4 text-primary" />
+                              <h4 className="text-sm font-semibold">AI Summary</h4>
                           </div>
-                          <details className="group">
-                            <summary className="flex items-center gap-2 text-xs font-medium text-primary cursor-pointer hover:text-primary/80 select-none">
-                              <span>Voir le JSON brut</span>
-                              <svg
-                                className="w-4 h-4 transition-transform group-open:rotate-180"
-                                fill="none"
-                                viewBox="0 0 24 24"
-                                stroke="currentColor"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 9l-7 7-7-7"
-                                />
-                              </svg>
-                            </summary>
-                            <div className="mt-2">
-                              <pre className="bg-slate-900 text-green-400 p-4 rounded-lg overflow-x-auto text-xs">
-                                {JSON.stringify(event.payload, null, 2)}
-                              </pre>
+                            <div className="bg-muted/50 p-3 rounded-lg">
+                              <p className="text-sm">{summary}</p>
                             </div>
-                          </details>
+                          </div>
+
+                          {/* Transcript */}
+                          <div>
+                            <h4 className="text-sm font-semibold mb-2">Transcript</h4>
+                            <ScrollArea className="h-[200px] w-full rounded-md border p-4 bg-muted/30">
+                              <p className="text-sm whitespace-pre-wrap">{transcript}</p>
+                            </ScrollArea>
+                          </div>
                         </CardContent>
                       </Card>
                     )
