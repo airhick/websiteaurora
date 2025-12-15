@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { fetchVAPIAssistants, fetchVAPIAssistant, type VAPIAssistant } from '@/lib/vapi'
-import { toast } from 'sonner'
 
 export function useVAPIAssistant(assistantId?: string) {
   const user = useAuthStore((state) => state.auth.user)

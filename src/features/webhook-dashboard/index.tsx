@@ -1,16 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { useAuthStore } from '@/stores/auth-store'
 import { Header } from '@/components/layout/header'
 import { Main } from '@/components/layout/main'
 import { TopNav } from '@/components/layout/top-nav'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { Search } from '@/components/search'
 import { ThemeSwitch } from '@/components/theme-switch'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Zap, Loader2, CheckCircle2, XCircle, Trash2, Phone, Clock, MessageSquare } from 'lucide-react'
+import { Phone, Clock, MessageSquare } from 'lucide-react'
 import { getCustomerAgents } from '@/lib/customer-agents'
 import { getCustomerId } from '@/lib/vapi-api-key'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -36,12 +34,11 @@ interface CallLog {
 }
 
 const topNav = [
-  { title: 'Dashboard', url: '/dashboard' },
-  { title: 'Webhook', url: '/webhook' },
+  { title: 'Dashboard', href: '/dashboard', isActive: false },
+  { title: 'Webhook', href: '/webhook', isActive: true },
 ]
 
 export function WebhookDashboard() {
-  const { user } = useAuthStore((state) => state.auth)
   const [calls, setCalls] = useState<CallLog[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const customerIdRef = useRef<number | null>(null)
@@ -221,7 +218,6 @@ export function WebhookDashboard() {
                     const summary = call.summary || 'No summary available'
                     const duration = formatDuration(call.duration)
                     const dateTime = formatDateTime(call.started_at || call.created_at)
-                    const time = formatTime(call.started_at || call.created_at)
                     
                     return (
                       <Card key={call.id} className="overflow-hidden">

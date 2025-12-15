@@ -252,7 +252,7 @@ export async function fetchVAPICalls(
       hasMore = false
     } else {
       // Find the oldest createdAt for the next page
-      const sortedCalls = calls.sort((a, b) => {
+      const sortedCalls = calls.sort((a: VAPICall, b: VAPICall) => {
         const aTime = a.createdAt || a.startedAt || ''
         const bTime = b.createdAt || b.startedAt || ''
         return aTime.localeCompare(bTime)

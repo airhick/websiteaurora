@@ -18,7 +18,7 @@ interface WebhookNotificationsState {
   clearAllNotifications: () => void
 }
 
-export const useWebhookNotificationsStore = create<WebhookNotificationsState>()((set, get) => ({
+export const useWebhookNotificationsStore = create<WebhookNotificationsState>()((set) => ({
   notifications: [],
   currentNotification: null,
   addNotification: (notification) => {

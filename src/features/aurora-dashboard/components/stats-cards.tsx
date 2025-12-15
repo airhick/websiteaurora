@@ -234,11 +234,6 @@ export function StatsCards() {
               Math.round(stats.totalMinutes).toLocaleString()
             )}
           </div>
-          <p className="text-xs text-muted-foreground">
-            {planMinutes 
-              ? t.stats.minutesUsedTotal.replace('{plan}', plan || t.stats.plan)
-              : t.stats.totalMinutesUsed}
-          </p>
         </CardContent>
       </Card>
       </div>

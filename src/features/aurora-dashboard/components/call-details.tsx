@@ -2,8 +2,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useVAPICalls } from '@/hooks/use-vapi-calls'
 import { fetchVAPICallDetail } from '@/lib/vapi'
 import { Badge } from '@/components/ui/badge'
-import { PhoneIncoming, PhoneOutgoing, MessageSquare, RefreshCw, Eye, X } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { PhoneIncoming, MessageSquare, RefreshCw, Eye, X } from 'lucide-react'
+import { useState } from 'react'
 import { useAuthStore } from '@/stores/auth-store'
 import { useTranslation } from '@/lib/translations'
 import {
@@ -81,7 +81,7 @@ export function CallDetails() {
 
     try {
       const detail = await fetchVAPICallDetail(apiKey, call.id)
-      const summary = detail.analysis?.summary || detail.summary || t.calls.noSummary
+      const summary = detail.analysis?.summary || t.calls.noSummary
       
       setExpandedSummaries({
         ...expandedSummaries,

@@ -1,4 +1,3 @@
-import { useEffect } from 'react'
 import { useWebhookNotificationsStore } from '@/stores/webhook-notifications-store'
 import { getCustomerId } from '@/lib/vapi-api-key'
 import {

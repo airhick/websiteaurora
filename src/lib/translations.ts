@@ -389,7 +389,7 @@ export function t(key: string, vars?: Record<string, string>): string {
   
   // Replace variables
   if (vars) {
-    return value.replace(/\{(\w+)\}/g, (match, varName) => {
+    return value.replace(/\{(\w+)\}/g, (match: string, varName: string) => {
       return vars[varName] || match
     })
   }

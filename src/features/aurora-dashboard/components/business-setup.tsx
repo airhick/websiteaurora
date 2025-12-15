@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { toast } from 'sonner'
 import { Mail, Lock } from 'lucide-react'
 import { authenticateWithCustomersTable, createAuthUserForCustomer } from '@/lib/custom-auth'
+import { supabase } from '@/lib/supabase'
 
 interface BusinessSetupProps {
   onComplete: () => void

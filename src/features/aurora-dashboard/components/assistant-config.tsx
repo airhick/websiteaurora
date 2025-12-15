@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useCustomerAssistants } from '@/hooks/use-customer-assistants'
 import { Badge } from '@/components/ui/badge'
-import { Settings, Wrench, MessageSquare, Loader2, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Info } from 'lucide-react'
+import { Settings, Wrench, MessageSquare, AlertCircle, RefreshCw, ChevronDown, ChevronUp, Info } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useState } from 'react'
@@ -214,7 +214,6 @@ function AssistantCard({
   const firstMessage = assistantData.firstMessage || model?.firstMessage || 'Not set'
   const voice = assistantData.voice || model?.voice || 'Default'
   const language = assistantData.language || model?.language || 'Auto'
-  const temperature = model?.temperature || assistantData.temperature || 'Default'
   
   return (
     <div className="border rounded-lg p-4 space-y-3">

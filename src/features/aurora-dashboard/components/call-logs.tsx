@@ -8,7 +8,7 @@ import { formatDistanceToNow } from 'date-fns'
 import { toast } from 'sonner'
 
 export function CallLogs() {
-  const { callLogs, loading, syncing, error, refresh, sync } = useCallLogs()
+  const { callLogs, loading, syncing, error, sync } = useCallLogs()
   const [playingId, setPlayingId] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 

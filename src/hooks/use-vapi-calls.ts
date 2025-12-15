@@ -3,7 +3,6 @@ import { fetchVAPICalls, type VAPICall } from '@/lib/vapi'
 import { getVAPIApiKey, getCustomerId } from '@/lib/vapi-api-key'
 import { getCustomerAgents } from '@/lib/customer-agents'
 import { getCallLogs, type CallLog } from '@/lib/call-logs-sync'
-import { toast } from 'sonner'
 
 /**
  * Convert CallLog to VAPICall format

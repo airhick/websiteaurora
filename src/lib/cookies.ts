@@ -3,7 +3,6 @@
  */
 
 const COOKIE_NAME = 'aurora_auth_session'
-const COOKIE_MAX_AGE = 30 * 24 * 60 * 60 // 30 days in seconds
 
 /**
  * Generic cookie utilities

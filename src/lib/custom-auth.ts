@@ -4,7 +4,7 @@
  */
 
 import { supabase } from './supabase'
-import { setAuthCookie, clearAuthCookie, getAuthCookie, type AuthCookie } from './cookies'
+import { setAuthCookie, clearAuthCookie, getAuthCookie } from './cookies'
 
 export interface Customer {
   id: number
