@@ -83,7 +83,7 @@ const DropdownMenuContent = React.forwardRef<
         <DropdownMenuPrimitive.Portal>
           <div
             className="fixed inset-0 z-[45] bg-black/30 backdrop-blur-sm animate-in fade-in-0"
-            onClick={(e) => {
+            onClick={() => {
               // Close dropdown when clicking backdrop
               const trigger = document.querySelector('[data-radix-dropdown-menu-trigger][data-state="open"]')
               if (trigger) {

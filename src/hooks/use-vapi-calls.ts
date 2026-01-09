@@ -18,7 +18,7 @@ function callLogToVAPICall(log: CallLog): VAPICall {
     messages: log.messages || undefined,
     transcript: log.transcript || undefined,
     assistantId: log.assistant_id || undefined,
-    artifact: null, // Not stored in call_logs table
+    artifact: undefined, // Not stored in call_logs table
   }
 }
 

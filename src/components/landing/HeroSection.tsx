@@ -9,7 +9,6 @@ import { useTheme } from "@/context/theme-provider";
 
 const HeroSection = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const { user } = useAuthStore((state) => state.auth);
   const { resolvedTheme } = useTheme();
 
   useEffect(() => {

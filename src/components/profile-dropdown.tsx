@@ -53,7 +53,7 @@ export function ProfileDropdown() {
             </div>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem variant='destructive' onClick={() => setOpen(true)}>
+          <DropdownMenuItem className="text-destructive focus:text-destructive" onClick={() => setOpen(true)}>
             Sign out
             <DropdownMenuShortcut className='text-current'>
               ⇧⌘Q

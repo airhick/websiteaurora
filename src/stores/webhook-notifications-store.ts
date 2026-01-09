@@ -13,13 +13,19 @@ export interface WebhookNotification {
 
 interface WebhookNotificationsState {
   notifications: WebhookNotification[]
+  currentNotification: WebhookNotification | null
   addNotification: (notification: WebhookNotification) => void
   removeNotification: (notificationId: number) => void
   clearAllNotifications: () => void
+  clearCurrentNotification: () => void
+  setCurrentNotification: (notification: WebhookNotification | null) => void
 }
 
 export const useWebhookNotificationsStore = create<WebhookNotificationsState>()((set) => ({
   notifications: [],
+  currentNotification: null,
+  setCurrentNotification: (notification) => set({ currentNotification: notification }),
+  clearCurrentNotification: () => set({ currentNotification: null }),
   addNotification: (notification) => {
     // Verify that the notification belongs to the current customer
     const currentCustomerId = getCustomerId()

@@ -174,10 +174,10 @@ export function CallLogs() {
                         )}
                       </div>
                       <p className="text-sm font-medium text-muted-foreground">
-                        {formatDateTime(log.started_at || log.created_at)}
+                        {formatDateTime(log.started_at || log.created_at_db)}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {formatTime(log.started_at || log.created_at)}
+                        {formatTime(log.started_at || log.created_at_db)}
                       </p>
                     </div>
                     {log.recording_url && (
@@ -206,12 +206,6 @@ export function CallLogs() {
                   <div className="flex items-center gap-4 text-xs text-muted-foreground">
                     {log.duration && (
                       <span>Duration: {formatDuration(log.duration)}</span>
-                    )}
-                    {log.cost && (
-                      <span>Cost: ${parseFloat(log.cost.toString()).toFixed(4)}</span>
-                    )}
-                    {log.customer_number && (
-                      <span>From: {log.customer_number}</span>
                     )}
                   </div>
                 </div>

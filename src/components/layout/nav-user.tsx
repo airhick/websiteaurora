@@ -107,7 +107,7 @@ export function NavUser() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem
-                variant='destructive'
+                className="text-destructive focus:text-destructive"
                 onClick={() => setOpen(true)}
               >
                 <LogOut />

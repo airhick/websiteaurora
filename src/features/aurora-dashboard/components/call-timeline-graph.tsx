@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useVAPICalls } from '@/hooks/use-vapi-calls'
-import { extractToolCalls, type VAPICall } from '@/lib/vapi'
+import { type VAPICall } from '@/lib/vapi'
 import { useTranslation } from '@/lib/translations'
 import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { Phone, Wrench, UserPlus, Clock, MessageSquare, CheckCircle, XCircle } from 'lucide-react'
@@ -220,7 +220,7 @@ function groupDataByTime(
   // Count tool calls per bucket
   toolCallEvents.forEach(event => {
     const bucket = Math.floor(event.timestamp / bucketSize) * bucketSize
-    const existing = buckets.get(bucket) || { calls: 0, toolCalls: 0, handoffs: 0 }
+    const existing = buckets.get(bucket) || { calls: 0, successful: 0, toolCalls: 0, handoffs: 0, callList: [] }
     existing.toolCalls++
     buckets.set(bucket, existing)
   })
@@ -228,7 +228,7 @@ function groupDataByTime(
   // Count handoffs per bucket
   handoffEvents.forEach(event => {
     const bucket = Math.floor(event.timestamp / bucketSize) * bucketSize
-    const existing = buckets.get(bucket) || { calls: 0, toolCalls: 0, handoffs: 0 }
+    const existing = buckets.get(bucket) || { calls: 0, successful: 0, toolCalls: 0, handoffs: 0, callList: [] }
     existing.handoffs++
     buckets.set(bucket, existing)
   })
@@ -314,18 +314,11 @@ export function CallTimelineGraph() {
   }, [timelineData])
   
   // Calculate total calls and max calls for Y-axis (memoized)
-  const { totalCalls, maxCalls, bucketSize } = useMemo(() => {
+  const { totalCalls, maxCalls } = useMemo(() => {
     const total = timelineData.reduce((sum, p) => sum + p.calls, 0)
     const max = Math.max(...timelineData.map(p => p.calls), 0)
     
-    const range = timelineData.length > 0 
-      ? timelineData[timelineData.length - 1].timestamp - timelineData[0].timestamp
-      : 0
-    const size = range < 7 * 24 * 60 * 60 * 1000 
-      ? 60 * 60 * 1000 // 1 hour
-      : 24 * 60 * 60 * 1000 // 1 day
-    
-    return { totalCalls: total, maxCalls: max, bucketSize: size }
+    return { totalCalls: total, maxCalls: max }
   }, [timelineData])
   
   // NOW we can do conditional returns after all hooks

@@ -5,7 +5,6 @@
 
 import { getCustomerAgents } from './customer-agents'
 import { getCustomerId } from './vapi-api-key'
-import { getVAPIApiKey } from './vapi-api-key'
 import { supabase } from './supabase'
 import type { CallLog } from './call-logs-sync'
 
