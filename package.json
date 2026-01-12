@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --port 8003",
     "build": "tsc -b && vite build",
-    "build:pages": "npm run build && cp CNAME docs/CNAME",
+    "build:pages": "npm run build",
     "lint": "eslint .",
     "preview": "vite preview --port 8003",
     "format:check": "prettier --check .",
